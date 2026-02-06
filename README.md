@@ -6,7 +6,7 @@ Claude Code skills for documentation testing and quality assurance.
 
 | Skill | Description |
 |-------|-------------|
-| [doctest](doctest/) | Apply DocTest to markdown documentation — detect PHP code blocks, add assertions/attributes, run doctest to verify |
+| [doctest](doctest/) | Apply DocTest to markdown documentation — detect PHP code blocks, add assertions/attributes, run doctest to verify, review docs against testable documentation best practices |
 
 ## Installation
 
@@ -43,6 +43,7 @@ After installing the doctest skill, use it in Claude Code:
 /doctest                    # Apply doctest to your documentation
 "run doctest"               # Verify existing doctest assertions
 "fix doctest failures"      # Fix failing doctest blocks
+"review docs"               # Review docs against testable documentation best practices
 ```
 
 ## Local Testing
