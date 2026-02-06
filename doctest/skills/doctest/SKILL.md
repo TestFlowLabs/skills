@@ -4,7 +4,8 @@ description: |
   Apply DocTest to markdown documentation. Detects PHP code blocks, adds
   appropriate assertions/attributes, runs doctest to verify. Use when asked
   to "add doctest", "test documentation", "apply doctest to docs",
-  "run doctest", "verify docs", or "fix doctest failures".
+  "run doctest", "verify docs", "fix doctest failures",
+  "review docs", or "review testable docs".
 allowed-tools:
   - Bash(php:*)
   - Bash(composer:*)
@@ -30,6 +31,7 @@ Detect the mode from the user's request:
 | **APPLY** | "apply doctest", "add doctest to docs", "test documentation" | Full workflow: install → analyze → convert → verify |
 | **VERIFY** | "run doctest", "verify docs", "check docs" | Just run `vendor/bin/doctest` and report results |
 | **FIX** | "fix doctest failures", "fix failing docs" | Analyze failures, fix blocks, re-verify |
+| **REVIEW** | "review docs", "review testable docs", "check docs quality" | Review documentation against testable docs best practices, suggest improvements |
 
 ---
 
@@ -161,6 +163,89 @@ Report the summary. If there are failures, show what failed and suggest fixes.
    - Whether wildcards would fix dynamic output issues
    - Whether the code itself has a bug
 3. Fix and re-verify each file
+
+---
+
+## REVIEW Mode — Testable Documentation Review
+
+Review existing documentation against the **Ten Principles of Testable Documentation** and suggest concrete improvements.
+
+The user may specify a project directory, a `docs/` folder, or a single `.md` file. Default to `docs/` and `README.md` if no path is given.
+
+### Step 1: SCAN
+
+1. Find all `.md` files in the target path
+2. Extract all PHP code blocks
+3. For each block, record: file, line number, code, existing attributes, existing assertions
+
+### Step 2: EVALUATE
+
+Check each code block against these principles (report violations only):
+
+| # | Principle | What to Check | Severity |
+|---|-----------|---------------|----------|
+| 1 | Every Example Should Run | Block uses undefined variables, missing imports, hidden state (`$user`, `$config`, `$app` without setup) | High |
+| 2 | One Concept Per Block | Block does 2+ unrelated things (e.g., array ops AND string ops AND math) | Medium |
+| 3 | Prefer `echo` Over `var_dump` | Block uses `var_dump()` or `print_r()` for output verification | Medium |
+| 4 | Handle Dynamic Output | Assertion uses hardcoded timestamps, dates, UUIDs instead of wildcards | High |
+| 5 | Mark Non-Runnable Explicitly | Block has external dependencies (DB, API, framework) but no `no_run`/`ignore` attribute | High |
+| 6 | Use Groups for Related Examples | Sequential blocks share variables but aren't grouped | Medium |
+| 7 | Document Error Conditions | Functions that can throw have no `throws` example nearby | Low |
+| 8 | Choose the Right Assertion | Using `doctest-matches` (regex) where `doctest` + wildcards would work, or `doctest` where `doctest-json` fits better | Low |
+| 9 | Keep Setup Minimal | Block has 5+ lines of boilerplate before the actual example | Medium |
+| 10 | Test-Driven Documentation | Block has no assertion at all and could have one (not a config/setup block) | Medium |
+
+Also check for **Anti-Patterns**:
+
+| Anti-Pattern | What to Check |
+|--------------|---------------|
+| Hidden State | Variables used but never defined in the block or a group |
+| Testing the Language | Block only demonstrates PHP built-ins, not the library's API |
+| Overly Complex | Block exceeds 15 lines |
+| Fragile Assertions | Uses `print_r` or `var_dump` output as expected value |
+| Ignoring Everything | Block marked `ignore` but could actually run |
+
+### Step 3: REPORT
+
+Present findings as a structured report:
+
+```
+## Testable Documentation Review: {path}
+
+### Summary
+- Files scanned: N
+- PHP blocks found: N
+- Violations found: N (High: N, Medium: N, Low: N)
+
+### Findings
+
+#### {file.md}:{line} — {Principle name} (Severity)
+**Current:**
+{code block as-is}
+
+**Issue:** {what's wrong}
+
+**Suggested fix:**
+{improved code block with proper assertion/attribute}
+
+---
+```
+
+### Step 4: APPLY (optional)
+
+If the user confirms, apply the suggested fixes:
+
+1. Edit each file with the suggested improvements
+2. Run `vendor/bin/doctest {file} -v` after each file
+3. Fix any issues from the run
+4. Report final results
+
+### Review Scope Options
+
+- `review docs/` — review all documentation
+- `review README.md` — review a single file
+- `review docs/ --strict` — also flag Low severity issues
+- `review docs/ --fix` — review and apply fixes immediately
 
 ---
 
