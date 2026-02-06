@@ -1,0 +1,11 @@
+{
+  "name": "testflowlabs",
+  "description": "TestFlowLabs Claude Code skills for documentation testing and quality assurance",
+  "plugins": [
+    {
+      "name": "doctest",
+      "path": "doctest",
+      "description": "Apply DocTest to markdown documentation — detect PHP code blocks, add assertions/attributes, run doctest to verify"
+    }
+  ]
+}
