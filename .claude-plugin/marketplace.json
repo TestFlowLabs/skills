@@ -5,7 +5,7 @@
     {
       "name": "doctest",
       "path": "doctest",
-      "description": "Apply DocTest to markdown documentation — detect PHP code blocks, add assertions/attributes, run doctest to verify"
+      "description": "Apply DocTest to markdown documentation — detect PHP code blocks, add assertions/attributes, run doctest to verify, review docs against testable documentation best practices"
     }
   ]
 }
