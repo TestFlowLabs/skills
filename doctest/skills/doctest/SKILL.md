@@ -71,7 +71,6 @@ Detect the mode from the user's request:
        ],
        'reporters' => [
            'console' => true,
-           'junit'   => null,
            'json'    => null,
        ],
    ];
