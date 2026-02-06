@@ -1,11 +1,8 @@
 {
   "name": "doctest",
-  "version": "1.0.0",
   "description": "Apply DocTest to markdown documentation — detect PHP code blocks, add assertions/attributes, run doctest to verify, review docs against testable documentation best practices",
-  "skills": [
-    {
-      "name": "doctest",
-      "path": "skills/doctest"
-    }
-  ]
+  "author": {
+    "name": "TestFlowLabs",
+    "email": "ye@deligoz.me"
+  }
 }
