@@ -1,11 +1,22 @@
 {
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "testflowlabs",
   "description": "TestFlowLabs Claude Code skills for documentation testing and quality assurance",
+  "owner": {
+    "name": "TestFlowLabs",
+    "email": "ye@deligoz.me"
+  },
   "plugins": [
     {
       "name": "doctest",
-      "path": "doctest",
-      "description": "Apply DocTest to markdown documentation — detect PHP code blocks, add assertions/attributes, run doctest to verify, review docs against testable documentation best practices"
+      "description": "Apply DocTest to markdown documentation — detect PHP code blocks, add assertions/attributes, run doctest to verify, review docs against testable documentation best practices",
+      "author": {
+        "name": "TestFlowLabs",
+        "email": "ye@deligoz.me"
+      },
+      "source": "./doctest",
+      "category": "development",
+      "homepage": "https://github.com/TestFlowLabs/skills/tree/master/doctest"
     }
   ]
 }
