@@ -5,7 +5,8 @@ description: |
   appropriate assertions/attributes, runs doctest to verify. Use when asked
   to "add doctest", "test documentation", "apply doctest to docs",
   "run doctest", "verify docs", "fix doctest failures",
-  "review docs", or "review testable docs".
+  "review docs", "review testable docs", "make docs runnable",
+  or "add hidden setup".
 allowed-tools:
   - Bash(php:*)
   - Bash(composer:*)
@@ -32,6 +33,7 @@ Detect the mode from the user's request:
 | **VERIFY** | "run doctest", "verify docs", "check docs" | Just run `vendor/bin/doctest` and report results |
 | **FIX** | "fix doctest failures", "fix failing docs" | Analyze failures, fix blocks, re-verify |
 | **REVIEW** | "review docs", "review testable docs", "check docs quality" | Review documentation against testable docs best practices, suggest improvements |
+| **MAKE-RUNNABLE** | "make docs runnable", "add hidden setup" | Add `// [!code hide]` boilerplate to non-runnable blocks |
 
 ---
 
@@ -248,6 +250,23 @@ If the user confirms, apply the suggested fixes:
 
 ---
 
+## MAKE-RUNNABLE Mode — Add Hidden Boilerplate
+
+Makes non-runnable blocks executable by adding `// [!code hide]` boilerplate. Hidden lines are invisible in rendered docs but execute when DocTest runs the block.
+
+See `reference/make-runnable.md` for the full workflow. Quick overview:
+
+1. **SCAN** — Find blocks with `ignore`/`no_run` or missing setup
+2. **CLASSIFY** — Determine what's missing (`<?php`, `use`, `require`, variables)
+3. **CONVERT** — Add hidden boilerplate:
+   - 1-3 lines → `// [!code hide]` per line
+   - 4+ lines → `// [!code hide:start]` / `// [!code hide:end]` block
+4. **FINALIZE** — Remove old attribute, add assertion, verify with `vendor/bin/doctest {file} -v`
+
+**When NOT to convert:** Config snippets (`return [...]`), framework-specific code, external service dependencies, intentionally broken code.
+
+---
+
 ## Assertion Syntax Reference
 
 See `reference/assertions.md` for full details. Quick reference:
@@ -353,11 +372,20 @@ Execution order: setup blocks → regular blocks → teardown blocks (all in doc
 
 ## Shiki Compatibility
 
-DocTest automatically handles Shiki markers used in VitePress:
+See `reference/shiki.md` for full details. DocTest automatically handles all Shiki markers. Processing order: `--` removal → `hide:start/end` block removal → catch-all regex strip.
 
-- **Line highlights** `{1,4-6}` — stripped from info string
-- **Diff removal** `// [!code --]` — entire line removed
-- **Diff addition** `// [!code ++]` — marker stripped, code kept
+| Marker | DocTest Behavior |
+|--------|-----------------|
+| `{1,4-6}` | Stripped from info string |
+| `// [!code --]` | Entire line removed |
+| `// [!code ++]` | Marker stripped, code kept |
+| `// [!code hide]` | Marker stripped, code kept |
+| `// [!code hide:start]` / `// [!code hide:end]` | Delimiter lines removed, inner lines kept |
+| `// [!code highlight]` | Marker stripped, code kept |
+| `// [!code focus]` | Marker stripped, code kept |
+| `// [!code warning]` | Marker stripped, code kept |
+| `// [!code error]` | Marker stripped, code kept |
+| `// [!code word:xxx]` | Marker stripped, code kept |
 
 No configuration needed. This is always active.
 
