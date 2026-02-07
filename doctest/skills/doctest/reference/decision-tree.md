@@ -31,6 +31,10 @@ Use this decision tree to classify each PHP code block and determine the appropr
    ├── YES → ADD `ignore` attribute
    └── NO → continue
 
+6b. Could it run with boilerplate? (missing <?php, use, require)
+    ├── YES → Consider MAKE-RUNNABLE mode (adds // [!code hide] boilerplate)
+    └── NO → continue
+
 7. Does it produce output? (echo, print, var_dump, print_r)
    ├── YES → go to OUTPUT CLASSIFICATION
    └── NO → continue

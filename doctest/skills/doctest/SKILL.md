@@ -106,7 +106,7 @@ For each code block, apply the **Decision Tree** (see `reference/decision-tree.m
 | `throw new Exception(...)` | Add `throws(ClassName)` attribute |
 | `{invalid syntax` (intentional parse error) | Add `parse_error` attribute |
 | `$db->query(...)`, file I/O, API calls | Add `no_run` attribute (syntax check only) |
-| `require 'vendor/...'`, `use App\...` without autoloader | Add `ignore` attribute |
+| `require 'vendor/...'`, `use App\...` without autoloader | Add `ignore`, or use MAKE-RUNNABLE to add hidden boilerplate |
 | Related sequence of blocks building on each other | Add `group="name"` attribute, consider `setup`/`teardown` |
 | Already has `ignore` / `no_run` / `throws` / `parse_error` | **SKIP** — already controlled |
 | No output, no side effects, just syntax demo | Leave as-is (blocks without assertions still pass if no error) |
