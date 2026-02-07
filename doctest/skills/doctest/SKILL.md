@@ -5,7 +5,8 @@ description: |
   appropriate assertions/attributes, runs doctest to verify. Use when asked
   to "add doctest", "test documentation", "apply doctest to docs",
   "run doctest", "verify docs", "fix doctest failures",
-  "review docs", or "review testable docs".
+  "review docs", "review testable docs", "make docs runnable",
+  or "add hidden setup".
 allowed-tools:
   - Bash(php:*)
   - Bash(composer:*)

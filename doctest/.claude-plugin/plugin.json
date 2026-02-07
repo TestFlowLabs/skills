@@ -1,6 +1,6 @@
 {
   "name": "doctest",
-  "description": "Apply DocTest to markdown documentation — detect PHP code blocks, add assertions/attributes, run doctest to verify, review docs against testable documentation best practices",
+  "description": "Apply DocTest to markdown documentation — detect PHP code blocks, add assertions/attributes, run doctest to verify, review docs against best practices, make non-runnable blocks executable with hidden boilerplate",
   "author": {
     "name": "TestFlowLabs",
     "email": "ye@deligoz.me"
