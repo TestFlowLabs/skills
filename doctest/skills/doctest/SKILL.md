@@ -32,6 +32,7 @@ Detect the mode from the user's request:
 | **VERIFY** | "run doctest", "verify docs", "check docs" | Just run `vendor/bin/doctest` and report results |
 | **FIX** | "fix doctest failures", "fix failing docs" | Analyze failures, fix blocks, re-verify |
 | **REVIEW** | "review docs", "review testable docs", "check docs quality" | Review documentation against testable docs best practices, suggest improvements |
+| **MAKE-RUNNABLE** | "make docs runnable", "add hidden setup" | Add `// [!code hide]` boilerplate to non-runnable blocks |
 
 ---
 
@@ -104,7 +105,7 @@ For each code block, apply the **Decision Tree** (see `reference/decision-tree.m
 | `throw new Exception(...)` | Add `throws(ClassName)` attribute |
 | `{invalid syntax` (intentional parse error) | Add `parse_error` attribute |
 | `$db->query(...)`, file I/O, API calls | Add `no_run` attribute (syntax check only) |
-| `require 'vendor/...'`, `use App\...` without autoloader | Add `ignore` attribute |
+| `require 'vendor/...'`, `use App\...` without autoloader | Add `ignore`, or use MAKE-RUNNABLE to add hidden boilerplate |
 | Related sequence of blocks building on each other | Add `group="name"` attribute, consider `setup`/`teardown` |
 | Already has `ignore` / `no_run` / `throws` / `parse_error` | **SKIP** — already controlled |
 | No output, no side effects, just syntax demo | Leave as-is (blocks without assertions still pass if no error) |
@@ -248,6 +249,96 @@ If the user confirms, apply the suggested fixes:
 
 ---
 
+## MAKE-RUNNABLE Mode — Add Hidden Boilerplate
+
+Makes non-runnable documentation code blocks executable by adding the necessary boilerplate with `// [!code hide]` markers. Hidden lines are invisible in rendered docs (VitePress/Shiki) but execute when DocTest runs the block.
+
+### Step 1: SCAN
+
+1. Find all PHP blocks in target files
+2. Identify blocks that are non-runnable: have `ignore` or `no_run` attributes, or would fail without setup code
+
+### Step 2: CLASSIFY
+
+For each non-runnable block, determine what's missing:
+
+| Missing | What to Add |
+|---------|-------------|
+| `<?php` declaration | `<?php // [!code hide]` as first line |
+| `use` imports | `use App\Models\User; // [!code hide]` |
+| `require` autoloader | `require_once 'vendor/autoload.php'; // [!code hide]` |
+| Variable definitions from context | `$config = [...]; // [!code hide]` |
+| Multi-line setup (4+ lines) | `// [!code hide:start]` / `// [!code hide:end]` block |
+
+### Step 3: CONVERT
+
+#### Single-line hide (1-3 lines of boilerplate)
+
+Append `// [!code hide]` to each boilerplate line:
+
+**Before:**
+````markdown
+```php ignore
+$user = User::find(1);
+echo $user->name;
+```
+````
+
+**After:**
+````markdown
+```php
+<?php // [!code hide]
+require_once 'vendor/autoload.php'; // [!code hide]
+use App\Models\User; // [!code hide]
+
+$user = User::find(1);
+echo $user->name;
+```
+<!-- doctest: Alice -->
+````
+
+#### Block hide (4+ lines of boilerplate)
+
+Use `// [!code hide:start]` and `// [!code hide:end]` delimiters:
+
+**Before:**
+````markdown
+```php ignore
+$total = $cart->total();
+echo "Total: $total";
+```
+````
+
+**After:**
+````markdown
+```php
+// [!code hide:start]
+<?php
+declare(strict_types=1);
+require_once 'vendor/autoload.php';
+use App\Services\Cart;
+use App\Models\Product;
+$cart = new Cart();
+$cart->add(new Product('Widget', 9.99));
+// [!code hide:end]
+
+$total = $cart->total();
+echo "Total: $total";
+```
+<!-- doctest: Total: 9.99 -->
+````
+
+### Step 4: REPORT
+
+1. Change `ignore` or `no_run` attribute to the appropriate assertion (remove attribute, add `<!-- doctest: -->`, `// =>`, etc.)
+2. Verify each file after conversion:
+   ```bash
+   vendor/bin/doctest {file} -v
+   ```
+3. Report summary: blocks converted, blocks still needing attention
+
+---
+
 ## Assertion Syntax Reference
 
 See `reference/assertions.md` for full details. Quick reference:
@@ -353,11 +444,20 @@ Execution order: setup blocks → regular blocks → teardown blocks (all in doc
 
 ## Shiki Compatibility
 
-DocTest automatically handles Shiki markers used in VitePress:
+DocTest automatically handles Shiki markers used in VitePress. Processing order: `--` removal → `hide:start/end` block removal → catch-all regex strip.
 
-- **Line highlights** `{1,4-6}` — stripped from info string
-- **Diff removal** `// [!code --]` — entire line removed
-- **Diff addition** `// [!code ++]` — marker stripped, code kept
+| Marker | DocTest Behavior |
+|--------|-----------------|
+| `{1,4-6}` | Stripped from info string |
+| `// [!code --]` | Entire line removed |
+| `// [!code ++]` | Marker stripped, code kept |
+| `// [!code hide]` | Marker stripped, code kept |
+| `// [!code hide:start]` / `// [!code hide:end]` | Delimiter lines removed, inner lines kept |
+| `// [!code highlight]` | Marker stripped, code kept |
+| `// [!code focus]` | Marker stripped, code kept |
+| `// [!code warning]` | Marker stripped, code kept |
+| `// [!code error]` | Marker stripped, code kept |
+| `// [!code word:xxx]` | Marker stripped, code kept |
 
 No configuration needed. This is always active.
 
