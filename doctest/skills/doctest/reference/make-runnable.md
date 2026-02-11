@@ -1,39 +1,129 @@
 # MAKE-RUNNABLE Mode Reference
 
-Makes non-runnable documentation code blocks executable by adding the necessary boilerplate with `// [!code hide]` markers. Hidden lines are invisible in rendered docs (VitePress/Shiki) but execute when DocTest runs the block.
+Make documentation code blocks executable. The goal is working code first, clean presentation second.
+
+**Philosophy:** Runnable first, hide second. Every code block must execute successfully before any cosmetic hiding is applied.
 
 ---
 
-## Workflow
+## Step 1: BOOTSTRAP INVENTORY
 
-### Step 1: SCAN
+Before touching any code block, understand the project's bootstrap landscape:
 
-1. Find all PHP blocks in target files
-2. Identify blocks that are non-runnable:
-   - Have `ignore` or `no_run` attributes
-   - Would fail without setup code (missing `<?php`, `use`, `require`, undefined variables)
+1. **Scan for existing profiles:**
+   ```bash
+   ls .doctest/*.php 2>/dev/null
+   ```
+2. **Check `doctest.php`** for global bootstrap config
+3. **List available profiles** — note what each provides (autoloader, framework, database, etc.)
 
-### Step 2: CLASSIFY
+This inventory determines whether to use `bootstrap="profile"` attributes (clean) or inline `// [!code hide]` (fallback).
 
-For each non-runnable block, determine what's missing:
+**Priority:** `bootstrap="profile"` > `group setup` > `// [!code hide:start/end]` > `// [!code hide]`
 
-| Missing | What to Add |
-|---------|-------------|
-| `<?php` declaration | `<?php // [!code hide]` as first line |
-| `use` imports | `use App\Models\User; // [!code hide]` |
-| `require` autoloader | `require_once 'vendor/autoload.php'; // [!code hide]` |
-| Variable definitions from context | `$config = [...]; // [!code hide]` |
-| Multi-line setup (4+ lines) | `// [!code hide:start]` / `// [!code hide:end]` block |
+---
 
-### Step 3: CONVERT
+## Step 2: CLASSIFY BLOCKS
 
-Choose the appropriate hide pattern based on number of boilerplate lines.
+For each PHP block that doesn't run, determine the scenario:
 
-#### Single-line hide (1-3 lines of boilerplate)
+| Scenario | Signal | Workflow |
+|----------|--------|----------|
+| **NEW** | User asks to "write an example", "add a code block" | Design → Run → Hide |
+| **EXISTING** | Block has `ignore`/`no_run`, or fails when executed | Analyze → Fix → Run → Hide |
 
-Append `// [!code hide]` to each boilerplate line:
+---
 
-**Before:**
+## Step 3A: NEW Block — Design → Run → Hide
+
+When writing a new documentation code block from scratch:
+
+1. **Write complete, runnable code** — include everything: imports, setup, the actual example, output
+2. **Verify it runs:**
+   ```bash
+   vendor/bin/doctest {file}:{N} -v
+   ```
+3. **Identify what the documentation teaches** — what should the reader focus on?
+4. **Hide everything else** with the appropriate technique
+5. **Add the assertion** (output, contains, json, expect)
+6. **Re-verify after hiding:**
+   ```bash
+   vendor/bin/doctest {file}:{N} -v
+   ```
+
+### Example: NEW Block for a Package API
+
+Goal: Document a `PriceCalculator::withTax()` method.
+
+**Phase 1 — Write complete runnable code:**
+
+````markdown
+```php bootstrap="laravel"
+use App\Services\PriceCalculator;
+
+$calculator = new PriceCalculator();
+$price = $calculator->withTax(100.00, 0.21);
+echo $price;
+```
+<!-- doctest: 121.00 -->
+````
+
+Verify: `vendor/bin/doctest docs/api.md:5 -v` → PASS
+
+**Phase 2 — Identify teaching purpose:**
+
+The reader should focus on `withTax(100.00, 0.21)` and the result. The `use` statement and constructor are boilerplate.
+
+**Phase 3 — Hide boilerplate:**
+
+````markdown
+```php bootstrap="laravel"
+use App\Services\PriceCalculator; // [!code hide]
+$calculator = new PriceCalculator(); // [!code hide]
+
+$price = $calculator->withTax(100.00, 0.21);
+echo $price;
+```
+<!-- doctest: 121.00 -->
+````
+
+Re-verify: `vendor/bin/doctest docs/api.md:5 -v` → PASS
+
+**What the reader sees (rendered):**
+
+```
+$price = $calculator->withTax(100.00, 0.21);
+echo $price;
+```
+
+---
+
+## Step 3B: EXISTING Block — Analyze → Fix → Run → Hide
+
+When an existing block doesn't run:
+
+1. **Run the block to see what fails:**
+   ```bash
+   vendor/bin/doctest {file}:{N} -vv
+   ```
+2. **Analyze the failure** — what's missing?
+3. **Choose the fix strategy:**
+
+   | Missing | Fix |
+   |---------|-----|
+   | Autoloader / framework | Add `bootstrap="profile"` attribute |
+   | `<?php` tag | Add `<?php // [!code hide]` |
+   | `use` imports | Add `use ...; // [!code hide]` |
+   | Variables from context | Add setup with `// [!code hide]` |
+   | Complex setup (4+ lines) | Use `// [!code hide:start/end]` block |
+
+4. **Run again** — repeat until passing
+5. **Add assertion** if missing
+
+### Example: EXISTING Block Needing Framework
+
+**Before — block marked as non-runnable:**
+
 ````markdown
 ```php ignore
 $user = User::find(1);
@@ -41,12 +131,15 @@ echo $user->name;
 ```
 ````
 
-**After:**
+**Step 1 — Run:** fails (no autoloader, no User class)
+
+**Step 2 — Check bootstrap inventory:** `.doctest/laravel.php` exists, `.doctest/database.php` exists, `.doctest/migrations.php` exists
+
+**Step 3 — Fix: add bootstrap + test data setup:**
+
 ````markdown
-```php
-<?php // [!code hide]
-require_once 'vendor/autoload.php'; // [!code hide]
-use App\Models\User; // [!code hide]
+```php bootstrap="laravel,database,migrations"
+$user = User::factory()->create(['name' => 'Alice']); // [!code hide]
 
 $user = User::find(1);
 echo $user->name;
@@ -54,59 +147,99 @@ echo $user->name;
 <!-- doctest: Alice -->
 ````
 
-#### Block hide (4+ lines of boilerplate)
+**Step 4 — Verify:** `vendor/bin/doctest docs/models.md:2 -v` → PASS
 
-Use `// [!code hide:start]` and `// [!code hide:end]` delimiters:
+Note: `bootstrap="laravel,database,migrations"` loads the framework, configures the database, and runs migrations. The factory call creates test data — hidden because readers don't need to see it.
+
+### Example: EXISTING Block with Complex Setup
 
 **Before:**
+
 ````markdown
-```php ignore
-$total = $cart->total();
-echo "Total: $total";
+```php no_run
+$report = $analyzer->generate($data);
+echo $report->summary();
 ```
 ````
 
-**After:**
+**After — using block hide for 4+ setup lines:**
+
 ````markdown
 ```php
 // [!code hide:start]
 <?php
-declare(strict_types=1);
 require_once 'vendor/autoload.php';
-use App\Services\Cart;
-use App\Models\Product;
-$cart = new Cart();
-$cart->add(new Product('Widget', 9.99));
+use App\Analytics\Analyzer;
+use App\Analytics\DataSet;
+
+$analyzer = new Analyzer();
+$data = DataSet::fromArray([
+    ['value' => 10, 'category' => 'A'],
+    ['value' => 20, 'category' => 'B'],
+]);
 // [!code hide:end]
 
-$total = $cart->total();
-echo "Total: $total";
+$report = $analyzer->generate($data);
+echo $report->summary();
 ```
-<!-- doctest: Total: 9.99 -->
+<!-- doctest-contains: Total: 30 -->
 ````
 
-### Step 4: FINALIZE
+---
 
-1. Remove the `ignore` or `no_run` attribute (the block is now runnable)
-2. Add the appropriate assertion (`<!-- doctest: -->`, `// =>`, etc.)
-3. Verify each file after conversion:
-   ```bash
-   vendor/bin/doctest {file} -v
-   ```
-4. Report summary: blocks converted, blocks still needing attention
+## Step 4: BOOTSTRAP RECOMMENDATIONS
+
+After processing blocks, look for repeated patterns:
+
+| Pattern | Recommendation |
+|---------|---------------|
+| 3+ blocks need autoloader | Add global bootstrap in `doctest.php`: `'bootstrap' => '.doctest/bootstrap.php'` |
+| 3+ blocks need same framework | Create `.doctest/{framework}.php` profile |
+| 3+ blocks need same DB tables | Create `.doctest/migrations.php` profile |
+| Blocks share variable definitions | Consider `group` with `setup` block instead of hide |
+
+Suggest new profiles to the user before creating them. Each profile should have a single responsibility — compose them with `bootstrap="a,b,c"` for blocks that need multiple concerns.
+
+---
+
+## Step 5: VERIFY ALL
+
+After all blocks are processed, run the full file:
+
+```bash
+vendor/bin/doctest {file} -v
+```
+
+Block index targeting (`file:N`) is for fast iteration on individual blocks. Final verification should always run the whole file to ensure blocks don't interfere with each other.
+
+---
+
+## Hide Strategy Reference
+
+| Boilerplate Size | Technique | Example |
+|------------------|-----------|---------|
+| Framework/autoloader | `bootstrap="profile"` attribute | `bootstrap="laravel"` |
+| Shared across blocks | `group` with `setup` block | `setup group="db"` |
+| 4+ lines | `// [!code hide:start/end]` block | See complex setup example above |
+| 1-3 lines | `// [!code hide]` per line | `use App\User; // [!code hide]` |
 
 ---
 
 ## Decision Guide
 
 ```
-Block has `ignore` or `no_run`?
-├── YES → Can the missing dependency be mocked/provided?
-│   ├── YES → How many boilerplate lines?
-│   │   ├── 1-3 lines → Single-line hide (// [!code hide])
-│   │   └── 4+ lines → Block hide (// [!code hide:start/end])
-│   └── NO → Leave as ignore/no_run
-└── NO → Not a MAKE-RUNNABLE candidate
+Block doesn't run?
+├── Needs framework/autoloader?
+│   ├── Profile exists → Add bootstrap="profile" attribute
+│   └── No profile → Suggest creating one, OR inline hide
+├── Missing <?php / use / require?
+│   └── Add with // [!code hide]
+├── Missing variable definitions?
+│   ├── 1-3 lines → // [!code hide] per line
+│   └── 4+ lines → // [!code hide:start/end]
+├── Too complex to mock?
+│   └── Leave as ignore/no_run
+└── After any fix → VERIFY with vendor/bin/doctest {file}:{N} -v
 ```
 
 ---
@@ -115,18 +248,8 @@ Block has `ignore` or `no_run`?
 
 Leave blocks as `ignore` or `no_run` when:
 
-- **Config snippets** (`return [...]`) — These are partial files, not executable
-- **Framework-specific code** — Requires Laravel/Symfony runtime, can't mock easily
-- **External service dependencies** — Redis, API calls, real databases
-- **Intentionally broken code** — Anti-pattern demonstrations
-- **Pseudocode** — Conceptual examples not meant to run
-
----
-
-## Tips
-
-- Start with blocks that only need 1-2 hidden lines (quick wins)
-- Use `// [!code hide:start/end]` for blocks needing complex setup
-- The companion npm package `shiki-hide-lines` renders hidden lines as collapsible placeholders in the browser
-- Always add an assertion after making a block runnable — otherwise there's no verification
-- Run DocTest after each file to catch issues early
+- **Config snippets** (`return [...]`) — partial files, not executable
+- **External service dependencies** — Redis, real APIs, real databases without mocking
+- **Intentionally broken code** — anti-pattern demonstrations
+- **Pseudocode** — conceptual examples not meant to run
+- **Mocking cost exceeds value** — complex setup for minimal verification benefit
