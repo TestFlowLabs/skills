@@ -187,7 +187,57 @@ echo $report->summary();
 
 ---
 
-## Step 4: BOOTSTRAP RECOMMENDATIONS
+## Step 4: HARDEN WITH INLINE ASSERTIONS
+
+After blocks run successfully, add `// =>` to strengthen verification on non-trivial expression lines.
+
+**Add `// =>` when the line:**
+- Computes a meaningful result: `$tax = $price * 0.21; // => 21.0`
+- Calls a method being documented: `$len = strlen('test'); // => 4`
+- Performs a transformation: `$upper = strtoupper('hello'); // => 'HELLO'`
+- Aggregates data: `$total = array_sum($prices); // => 299.97`
+
+**Skip `// =>` when the line:**
+- Assigns a literal: `$name = 'Alice'`
+- Constructs an object: `$calculator = new Calculator()`
+- Performs a side effect: `$db->save()`, `file_put_contents(...)`
+- Already outputs via `echo` with a `<!-- doctest: -->` assertion
+
+### Example: Hardening a Multi-Step Computation
+
+**Before (runs, but only checks final output):**
+
+````markdown
+```php
+$items = [10.00, 25.50, 14.50];
+$subtotal = array_sum($items);
+$tax = $subtotal * 0.21;
+$total = $subtotal + $tax;
+echo "Total: $total";
+```
+<!-- doctest: Total: 60.5 -->
+````
+
+**After (intermediate values verified):**
+
+````markdown
+```php
+$items = [10.00, 25.50, 14.50];
+$subtotal = array_sum($items); // => 50.0
+$tax = $subtotal * 0.21; // => 10.5
+$total = $subtotal + $tax; // => 60.5
+echo "Total: $total";
+```
+<!-- doctest: Total: 60.5 -->
+````
+
+Now if `array_sum` or the tax calculation changes, the `// =>` assertions catch the exact line where the value diverges — not just the final output.
+
+**Verify after adding:** `vendor/bin/doctest {file}:{N} -v` — all `// =>` are checked alongside the output assertion.
+
+---
+
+## Step 5: BOOTSTRAP RECOMMENDATIONS
 
 After processing blocks, look for repeated patterns:
 
@@ -202,7 +252,7 @@ Suggest new profiles to the user before creating them. Each profile should have 
 
 ---
 
-## Step 5: VERIFY ALL
+## Step 6: VERIFY ALL
 
 After all blocks are processed, run the full file:
 
