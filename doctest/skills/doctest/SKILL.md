@@ -128,6 +128,7 @@ Process file by file:
    - Dynamic output → switch to wildcard or `doctest-contains`
    - Needs autoloader → suggest bootstrap config
    - Block depends on earlier block → add `group` attribute
+6. Add `// =>` to non-trivial expression lines where no output assertion covers the value (see Inline Assertion Strategy)
 
 ### Example: Converting a Block
 
@@ -299,9 +300,10 @@ See `reference/make-runnable.md` for the full workflow with examples.
 1. **BOOTSTRAP INVENTORY** — Scan `.doctest/` for existing profiles, check `doctest.php` for global bootstrap
 2. **CLASSIFY** — For each block: NEW (design from scratch) or EXISTING (fix to make runnable)
 3. **MAKE RUNNABLE** — Write/add minimum code, verify with `vendor/bin/doctest {file}:{N} -v`, iterate until green
-4. **HIDE** — Once running, hide boilerplate with `// [!code hide]` or `bootstrap="profile"` attributes
-5. **RE-VERIFY** — Confirm block still passes after hiding: `vendor/bin/doctest {file}:{N} -v`
-6. **BOOTSTRAP RECOMMENDATIONS** — If 3+ blocks share setup, suggest a `.doctest/` profile
+4. **HARDEN** — Add `// =>` to non-trivial expression lines (see Inline Assertion Strategy)
+5. **HIDE** — Once running, hide boilerplate with `// [!code hide]` or `bootstrap="profile"` attributes
+6. **RE-VERIFY** — Confirm block still passes after hiding: `vendor/bin/doctest {file}:{N} -v`
+7. **BOOTSTRAP RECOMMENDATIONS** — If 3+ blocks share setup, suggest a `.doctest/` profile
 
 ### Key Principles
 
@@ -356,6 +358,21 @@ echo $x;
 
 ---
 
+## Inline Assertion Strategy
+
+When processing blocks in any mode (APPLY, MAKE-RUNNABLE, FIX), proactively add `// =>` to strengthen verification:
+
+| Add `// =>` | Skip `// =>` |
+|-------------|-------------|
+| Computes a result: `$tax = $price * 0.21; // => 21.0` | Simple literal: `$name = 'Alice'` |
+| API demonstration: `$len = strlen('test'); // => 4` | Object construction: `$calc = new Calc()` |
+| Transformation: `$upper = strtoupper('hi'); // => 'HI'` | Side effect: `$db->save()` |
+| Collection operation: `$sum = array_sum([1,2]); // => 3` | Already echoed with `<!-- doctest: -->` |
+
+Aim for assertions on **meaningful computation lines**. Users can remove unwanted `// =>` — under-asserting is worse than over-asserting. See `reference/assertions.md` for full syntax and placement guide.
+
+---
+
 ## Attribute Syntax Reference
 
 See `reference/attributes.md` for full details. Two syntaxes are available:
@@ -399,12 +416,7 @@ See `reference/wildcards.md` for full details. Use in `<!-- doctest: -->` assert
 | `{{datetime}}` | ISO datetime with optional timezone |
 | `{{...}}` | Any content including newlines (non-greedy) |
 
-Example:
-```markdown
-<!-- doctest: Generated: {{date}} {{time}} -->
-<!-- doctest: User ID: {{uuid}} -->
-<!-- doctest: {"id":{{int}},"created":"{{datetime}}","price":{{float}}} -->
-```
+Example: `<!-- doctest: User ID: {{uuid}} at {{datetime}} -->`
 
 ---
 
@@ -476,7 +488,7 @@ Exit codes: `0` = all passed, `1` = failures, `3` = no testable blocks found
 
 1. **Never add assertions to blocks that already have them** — check first
 2. **Prefer invisible assertions** (HTML comments) over inline `// =>` for output
-3. **Use `// =>` only for return value demonstrations** where the pattern is natural
+3. **Proactively add `// =>` to non-trivial expressions** — see Inline Assertion Strategy
 4. **Use the simplest assertion type** — `<!-- doctest: -->` before `<!-- doctest-matches: -->`
 5. **Use wildcards over regex** when possible — they're more readable
 6. **Group blocks that depend on each other** — don't force standalone execution
