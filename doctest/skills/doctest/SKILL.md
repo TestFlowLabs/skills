@@ -33,7 +33,7 @@ Detect the mode from the user's request:
 | **VERIFY** | "run doctest", "verify docs", "check docs" | Just run `vendor/bin/doctest` and report results |
 | **FIX** | "fix doctest failures", "fix failing docs" | Analyze failures, fix blocks, re-verify |
 | **REVIEW** | "review docs", "review testable docs", "check docs quality" | Review documentation against testable docs best practices, suggest improvements |
-| **MAKE-RUNNABLE** | "make docs runnable", "add hidden setup" | Add `// [!code hide]` boilerplate to non-runnable blocks |
+| **MAKE-RUNNABLE** | "make docs runnable", "add hidden setup", "make this block work" | Make code blocks executable — runnable first, hide second |
 
 ---
 
@@ -129,6 +129,29 @@ Process file by file:
    - Needs autoloader → suggest bootstrap config
    - Block depends on earlier block → add `group` attribute
 
+### Example: Converting a Block
+
+**Found in docs/api.md — block has output but no assertion:**
+
+````markdown
+```php
+echo strtoupper('hello');
+```
+````
+
+**Classification:** Static output → add exact assertion.
+
+**After conversion:**
+
+````markdown
+```php
+echo strtoupper('hello');
+```
+<!-- doctest: HELLO -->
+````
+
+**Verify:** `vendor/bin/doctest docs/api.md:1 -v` → `:3 ✔ echo strtoupper('hello');  [1/1]  0.02s`
+
 ### Step 5: REPORT
 
 1. Run full suite:
@@ -163,7 +186,22 @@ Report the summary. If there are failures, show what failed and suggest fixes.
    - Whether the code block needs a different assertion type
    - Whether wildcards would fix dynamic output issues
    - Whether the code itself has a bug
-3. Fix and re-verify each file
+3. Fix and re-verify each file — use `file:N` to target specific blocks for fast iteration
+
+### Example: Fixing a Dynamic Output Failure
+
+```
+vendor/bin/doctest docs/api.md -vv
+  :7 ✖ echo date('Y');  [1/3]  0.02s
+    Expected: 2025
+    Actual:   2026
+```
+
+**Diagnosis:** Hardcoded year in assertion will break every January.
+
+**Fix:** Change `<!-- doctest: 2025 -->` to `<!-- doctest-matches: /^\d{4}$/ -->` or use a wildcard: `<!-- doctest: {{int}} -->`.
+
+**Verify:** `vendor/bin/doctest docs/api.md:7 -v` → PASS
 
 ---
 
@@ -250,20 +288,29 @@ If the user confirms, apply the suggested fixes:
 
 ---
 
-## MAKE-RUNNABLE Mode — Add Hidden Boilerplate
+## MAKE-RUNNABLE Mode — Make Documentation Code Executable
 
-Makes non-runnable blocks executable by adding `// [!code hide]` boilerplate. Hidden lines are invisible in rendered docs but execute when DocTest runs the block.
+**Philosophy:** Runnable first, hide second. Every code block must execute successfully before any cosmetic hiding is applied.
 
-See `reference/make-runnable.md` for the full workflow. Quick overview:
+See `reference/make-runnable.md` for the full workflow with examples.
 
-1. **SCAN** — Find blocks with `ignore`/`no_run` or missing setup
-2. **CLASSIFY** — Determine what's missing (`<?php`, `use`, `require`, variables)
-3. **CONVERT** — Add hidden boilerplate:
-   - 1-3 lines → `// [!code hide]` per line
-   - 4+ lines → `// [!code hide:start]` / `// [!code hide:end]` block
-4. **FINALIZE** — Remove old attribute, add assertion, verify with `vendor/bin/doctest {file} -v`
+### Core Workflow
 
-**When NOT to convert:** Config snippets (`return [...]`), framework-specific code, external service dependencies, intentionally broken code.
+1. **BOOTSTRAP INVENTORY** — Scan `.doctest/` for existing profiles, check `doctest.php` for global bootstrap
+2. **CLASSIFY** — For each block: NEW (design from scratch) or EXISTING (fix to make runnable)
+3. **MAKE RUNNABLE** — Write/add minimum code, verify with `vendor/bin/doctest {file}:{N} -v`, iterate until green
+4. **HIDE** — Once running, hide boilerplate with `// [!code hide]` or `bootstrap="profile"` attributes
+5. **RE-VERIFY** — Confirm block still passes after hiding: `vendor/bin/doctest {file}:{N} -v`
+6. **BOOTSTRAP RECOMMENDATIONS** — If 3+ blocks share setup, suggest a `.doctest/` profile
+
+### Key Principles
+
+- **Run before hide** — Never add `// [!code hide]` to code you haven't verified runs
+- **Use bootstrap profiles** over inline `// [!code hide]` when setup is framework/autoloader related
+- **Target single blocks** with `file:N` syntax for fast iteration (e.g., `vendor/bin/doctest docs/api.md:3 -v`)
+- **Iterate until green** — Fix loop: run → analyze failure → fix → run again
+
+**When NOT to convert:** Config snippets (`return [...]`), external service dependencies, intentionally broken code, pseudocode.
 
 ---
 
@@ -287,6 +334,14 @@ See `reference/assertions.md` for full details. Quick reference:
 $x = 42; // => 42
 ```
 
+### Debug Dump (inspect without failing)
+
+```php
+$x = 42; // => dd()
+```
+
+Always passes. Value shown in output regardless of verbosity. Useful for exploring values during development.
+
 ### Multiple Assertions per Block
 
 ````markdown
@@ -303,19 +358,27 @@ echo $x;
 
 ## Attribute Syntax Reference
 
-See `reference/attributes.md` for full details. Attributes go in the fence info string after `php`:
+See `reference/attributes.md` for full details. Two syntaxes are available:
 
+**Info string** (after `php`):
 ````markdown
 ```php ignore
 ```php no_run
-```php throws
 ```php throws(ExceptionClass)
-```php throws(ExceptionClass, "message substring")
 ```php parse_error
 ```php group="name"
 ```php setup group="name"
-```php teardown group="name"
+```php bootstrap="laravel,database"
 ````
+
+**HTML comment** (preserves editor syntax highlighting):
+````markdown
+<!-- doctest-attr: ignore -->
+<!-- doctest-attr: throws(InvalidArgumentException) -->
+<!-- doctest-attr: bootstrap="laravel" group="users" setup -->
+````
+
+Place the comment on the line immediately before the code fence. Both syntaxes can coexist (but not for the same attribute).
 
 **Processing priority:** ignore → no_run → parse_error → throws → group/setup/teardown
 
@@ -347,47 +410,23 @@ Example:
 
 ## Group Patterns
 
-See `reference/groups.md` for full details. Groups share state across blocks:
+See `reference/groups.md` for full details. Groups share state across blocks with `group="name"`. Add `setup`/`teardown` for initialization and cleanup.
 
-````markdown
-```php setup group="db"
-$pdo = new PDO('sqlite::memory:');
-$pdo->exec('CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)');
-```
-
-```php group="db"
-$pdo->exec("INSERT INTO users (name) VALUES ('Alice')");
-echo $pdo->query('SELECT COUNT(*) FROM users')->fetchColumn();
-```
-<!-- doctest: 1 -->
-
-```php teardown group="db"
-$pdo->exec('DROP TABLE users');
-```
-````
-
-Execution order: setup blocks → regular blocks → teardown blocks (all in document order within group).
+Execution order: setup → regular blocks → teardown (all in document order within group). All blocks in a group must have identical `bootstrap` profiles.
 
 ---
 
 ## Shiki Compatibility
 
-See `reference/shiki.md` for full details. DocTest automatically handles all Shiki markers. Processing order: `--` removal → `hide:start/end` block removal → catch-all regex strip.
+See `reference/shiki.md` for full details. DocTest automatically strips all Shiki markers:
 
-| Marker | DocTest Behavior |
-|--------|-----------------|
-| `{1,4-6}` | Stripped from info string |
-| `// [!code --]` | Entire line removed |
-| `// [!code ++]` | Marker stripped, code kept |
-| `// [!code hide]` | Marker stripped, code kept |
-| `// [!code hide:start]` / `// [!code hide:end]` | Delimiter lines removed, inner lines kept |
-| `// [!code highlight]` | Marker stripped, code kept |
-| `// [!code focus]` | Marker stripped, code kept |
-| `// [!code warning]` | Marker stripped, code kept |
-| `// [!code error]` | Marker stripped, code kept |
-| `// [!code word:xxx]` | Marker stripped, code kept |
+- `// [!code --]` → line removed entirely
+- `// [!code hide]` → marker stripped, code kept (primary tool for MAKE-RUNNABLE)
+- `// [!code hide:start/end]` → delimiters removed, inner code kept
+- All other markers (`++`, `highlight`, `focus`, `warning`, `error`, `word:xxx`) → marker stripped, code kept
+- `{1,4-6}` → stripped from info string
 
-No configuration needed. This is always active.
+No configuration needed. Always active.
 
 ---
 
@@ -396,15 +435,21 @@ No configuration needed. This is always active.
 ```bash
 vendor/bin/doctest [files...] [options]
 
+Arguments:
+  files                Markdown files or directories (supports file:N for block targeting)
+
 Options:
   --filter, -f         Filter blocks by content or file name
   --exclude            Exclude files matching pattern
   --dry-run            Parse only, don't execute
   --stop-on-failure    Stop on first failure
+  --parallel, -p       Run blocks in parallel (auto-detects CPU cores, or specify: -p 4)
   --config, -c         Path to config file (default: doctest.php)
   -v                   Verbose — show per-assertion details
   -vv                  Very verbose — also show source on failure
 ```
+
+**Block targeting:** `vendor/bin/doctest README.md:3` runs only the 3rd PHP block in the file (1-based). Useful for iterating on a single block during MAKE-RUNNABLE or FIX workflows.
 
 Exit codes: `0` = all passed, `1` = failures, `3` = no testable blocks found
 
@@ -422,6 +467,8 @@ Exit codes: `0` = all passed, `1` = failures, `3` = no testable blocks found
 | Needs bootstrap/autoload | Suggest adding `bootstrap` key to config |
 | No PHP blocks in file | Skip silently |
 | Code outputs nothing, no assertion | Leave as-is — passes if no error |
+| Need machine-readable results | Add `'reporters' => ['json' => 'build/doctest.json']` to config |
+| Slow test suite | Add `--parallel` flag or `'execution' => ['parallel' => 4]` to config |
 
 ---
 
