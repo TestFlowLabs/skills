@@ -195,6 +195,70 @@ Some attributes combine naturally:
 
 ---
 
+## bootstrap
+
+Load PHP files before executing a code block. Profiles are `.php` files in the `.doctest/` directory.
+
+**Info string syntax:**
+````markdown
+```php bootstrap="laravel"
+echo config('app.name');
+```
+
+```php bootstrap="laravel,database"
+// Both profiles loaded, left to right
+```
+````
+
+**HTML comment syntax:**
+````markdown
+<!-- doctest-attr: bootstrap="laravel" -->
+```php
+echo config('app.name');
+```
+````
+
+**Profile discovery:** Only `.php` files directly in `.doctest/` are discovered (not subdirectories). File name without `.php` becomes the profile name.
+
+**Execution order:** global bootstrap (config) → profiles (left to right) → setup → code → teardown
+
+**With groups:** All blocks in the same group must use identical bootstrap profiles.
+
+**Custom directory:** Set `bootstraps_dir` in config (default: `.doctest`).
+
+---
+
+## HTML Comment Attribute Syntax
+
+All attributes can be specified via HTML comments instead of the info string. This preserves editor syntax highlighting for the PHP code.
+
+**Syntax:** `<!-- doctest-attr: attribute_here -->` on the line immediately before the code fence.
+
+````markdown
+<!-- doctest-attr: ignore -->
+```php
+$config = require 'missing-file.php';
+```
+
+<!-- doctest-attr: throws(InvalidArgumentException) -->
+```php
+throw new InvalidArgumentException('Bad input');
+```
+
+<!-- doctest-attr: bootstrap="laravel" group="users" setup -->
+```php
+$user = User::factory()->create();
+```
+````
+
+**Rules:**
+- Must appear on the line directly before the code fence
+- Both syntaxes (info string and HTML comment) can coexist on the same block
+- But the same attribute should not appear in both places
+- Supports all attributes: `ignore`, `no_run`, `throws`, `parse_error`, `group`, `setup`, `teardown`, `bootstrap`
+
+---
+
 ## Processing Priority
 
 When a block has attributes, DocTest processes in this order:
