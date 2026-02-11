@@ -282,3 +282,22 @@ Code blocks without any assertion still execute. If they produce no error, they 
 | Need to check a variable's value without printing | `<!-- doctest-expect: $var === value -->` |
 | Showing expression return values inline | `$x = expr; // => value` |
 | Inspecting values during development (always passes) | `$x = expr; // => dd()` |
+
+---
+
+## Inline Assertion Placement Guide
+
+When proactively adding `// =>` to code blocks:
+
+| Line Type | Add `// =>`? | Reason |
+|-----------|-------------|--------|
+| Method call with return value | Yes | Documents API behavior |
+| Math/string computation | Yes | Verifies intermediate steps |
+| Collection operation | Yes | Confirms transformation result |
+| Simple literal assignment | No | Trivial — no computation to verify |
+| Object construction | No | Return value is obvious (the object) |
+| Side-effect call (`save`, `delete`) | No | Return value is not the focus |
+| Line with `echo`/`print` | No | Use `<!-- doctest: -->` instead |
+| Variable already checked by `expect` | No | Redundant verification |
+
+**Principle:** `// =>` adds value when it verifies a **computation** the reader should understand. It adds noise when the value is obvious from the code.
