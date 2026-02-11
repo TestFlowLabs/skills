@@ -216,6 +216,38 @@ $y = 42; // => 42   <-- This IS an assertion
 
 ---
 
+## 7. Debug Dump (`// => dd()`)
+
+Inspect expression values without affecting pass/fail. Always passes. Value always shown in output regardless of verbosity level.
+
+**Syntax:**
+```php
+$x = 42; // => dd()
+```
+
+**Output:** `dd $x = 42 => 42`
+
+**Multiple expressions:**
+```php
+$x = 1; // => dd()
+$y = 2; // => dd()
+$z = $x + $y; // => dd()
+```
+
+**How it works:**
+- Expression left of `// => dd()` is evaluated
+- Result formatted with `var_export()`
+- Printed to output as `dd {expression} => {value}`
+- Block **always passes** regardless of value
+
+**When to use:**
+- Exploring what an expression returns during development
+- Understanding intermediate values in multi-step code
+- Debugging a failing block by inspecting values
+- Can be combined with other assertions in the same block
+
+---
+
 ## Combining Assertions
 
 A single code block can have multiple assertions of different types:
@@ -249,3 +281,4 @@ Code blocks without any assertion still execute. If they produce no error, they 
 | Block outputs JSON | `<!-- doctest-json: {...} -->` |
 | Need to check a variable's value without printing | `<!-- doctest-expect: $var === value -->` |
 | Showing expression return values inline | `$x = expr; // => value` |
+| Inspecting values during development (always passes) | `$x = expr; // => dd()` |
