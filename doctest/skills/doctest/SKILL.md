@@ -109,6 +109,7 @@ For each code block, apply the **Decision Tree** (see `reference/decision-tree.m
 | `require 'vendor/...'`, `use App\...` without autoloader | Add `ignore`, or use MAKE-RUNNABLE to add hidden boilerplate |
 | Related sequence of blocks building on each other | Add `group="name"` attribute, consider `setup`/`teardown` |
 | Already has `ignore` / `no_run` / `throws` / `parse_error` | **SKIP** — already controlled |
+| Output should be shown in docs but not asserted | Add `<!-- doctest-output -->` before an empty code block — refreshed on `--update` |
 | No output, no side effects, just syntax demo | Leave as-is (blocks without assertions still pass if no error) |
 
 ### Step 4: CONVERT
@@ -187,7 +188,12 @@ Report the summary. If there are failures, show what failed and suggest fixes.
    - Whether the code block needs a different assertion type
    - Whether wildcards would fix dynamic output issues
    - Whether the code itself has a bug
-3. Fix and re-verify each file — use `file:N` to target specific blocks for fast iteration
+3. **Quick fix with `--update`:** For stale assertion values (code changed, output changed), run:
+   ```bash
+   vendor/bin/doctest docs/api.md --update
+   ```
+   This auto-rewrites updatable assertions (`<!-- doctest: -->`, `<!-- doctest-json: -->`, `// =>`) with actual output. Look for `✎` in the output. Non-updatable assertions (wildcards, regex, contains, expect) are skipped.
+4. Fix and re-verify each file — use `file:N` to target specific blocks for fast iteration
 
 ### Example: Fixing a Dynamic Output Failure
 
@@ -330,6 +336,21 @@ See `reference/assertions.md` for full details. Quick reference:
 <!-- doctest-expect: $variable === value -->
 ```
 
+### Display Output Directive (updated on `--update`, never asserted)
+
+````markdown
+```php
+echo "Hello\nWorld";
+```
+<!-- doctest-output -->
+```
+Hello
+World
+```
+````
+
+Options: `<!-- doctest-output: lines=5 -->` (first N lines), `<!-- doctest-output: tail=3 -->` (last N lines).
+
 ### Inline Result Comment
 
 ```php
@@ -454,6 +475,7 @@ Options:
   --filter, -f         Filter blocks by content or file name
   --exclude            Exclude files matching pattern
   --dry-run            Parse only, don't execute
+  --update, -u         Auto-update stale assertions with actual output (mutually exclusive with --dry-run)
   --stop-on-failure    Stop on first failure
   --parallel, -p       Run blocks in parallel (auto-detects CPU cores, or specify: -p 4)
   --config, -c         Path to config file (default: doctest.php)
@@ -463,7 +485,7 @@ Options:
 
 **Block targeting:** `vendor/bin/doctest README.md:3` runs only the 3rd PHP block in the file (1-based). Useful for iterating on a single block during MAKE-RUNNABLE or FIX workflows.
 
-Exit codes: `0` = all passed, `1` = failures, `3` = no testable blocks found
+Exit codes: `0` = all passed (or all updated), `1` = failures (or non-updatable failures in `--update` mode), `3` = no testable blocks found
 
 ---
 
